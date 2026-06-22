@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: blog-rag
+  datasource:
+    url: jdbc:postgresql://localhost:5432/blog_rag
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+  ai:
+    ollama:
+      base-url: http://localhost:11434
+      embedding:
+        options:
+          model: nomic-embed-text
+      chat:
+        options:
+          model: llama3.1:8b
+    vectorstore:
+      pgvector:
+        index-type: hnsw
+        distance-type: cosine_distance
+        dimensions: 768
+
+server:
+  port: 8080
+
+naver:
+  client-id: ${NAVER_CLIENT_ID}
+  client-secret: ${NAVER_CLIENT_SECRET}
+  blog-id: ${NAVER_BLOG_ID}
