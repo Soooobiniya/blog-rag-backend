@@ -6,6 +6,7 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -19,9 +20,17 @@ public class CrawlService {
     private String blogId;
 
     private final VectorStore vectorStore;
+    private final JdbcTemplate jdbcTemplate;
 
-    public CrawlService(VectorStore vectorStore) {
+    public CrawlService(VectorStore vectorStore, JdbcTemplate jdbcTemplate) {
         this.vectorStore = vectorStore;
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    public int getPostingCount() {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM vector_store", Integer.class);
+        return count != null ? count : 0;
     }
 
     public List<String> crawlAndStore() throws Exception {
