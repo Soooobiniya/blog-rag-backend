@@ -4,6 +4,7 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -47,20 +48,26 @@ public class CrawlService {
             Elements posts = listPage.select("div[id^=post-view]");
             if (posts.isEmpty()) break;
 
+            TokenTextSplitter splitter = TokenTextSplitter.builder()
+                    .withChunkSize(500)
+                    .withMinChunkSizeChars(50)
+                    .withKeepSeparator(true)
+                    .build();
+
             for (Element post : posts) {
                 String postId = post.attr("id").replace("post-view", "");
                 String postUrl = "https://blog.naver.com/" + blogId + "/" + postId;
-                String title = postId;
 
                 String content = crawlContent(postUrl);
                 if (content.isEmpty()) continue;
 
                 org.springframework.ai.document.Document doc =
                         new org.springframework.ai.document.Document(content, Map.of(
-                                "title", title,
+                                "title", postId,
                                 "url", postUrl
                         ));
-                documents.add(doc);
+                List<org.springframework.ai.document.Document> chunks = splitter.apply(List.of(doc));
+                documents.addAll(chunks);
                 savedTitles.add(postUrl);
             }
         }

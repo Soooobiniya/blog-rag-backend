@@ -14,7 +14,7 @@ spring:
       base-url: http://localhost:11434
       embedding:
         options:
-          model: nomic-embed-text
+          model: bge-m3
       chat:
         options:
           model: llama3.1:8b
@@ -22,7 +22,7 @@ spring:
       pgvector:
         index-type: hnsw
         distance-type: cosine_distance
-        dimensions: 768
+        dimensions: 1024
 
 server:
   port: 8080

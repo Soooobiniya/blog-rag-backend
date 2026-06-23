@@ -25,8 +25,12 @@ public class RagService {
         List<org.springframework.ai.document.Document> docs = vectorStore.similaritySearch(
                 SearchRequest.builder()
                         .query(message)
-                        .topK(3)
+                        .topK(5)
+                        .similarityThreshold(0.1)
                         .build()
+        );
+        docs.forEach(doc ->
+                System.out.println("검색된 문서: " + doc.getMetadata().get("url") + " / " + doc.getText().substring(0, Math.min(50, doc.getText().length())))
         );
 
         // 2. 검색된 문서로 컨텍스트 구성
@@ -38,15 +42,17 @@ public class RagService {
         List<String> sources = docs.stream()
                 .map(doc -> (String) doc.getMetadata().get("url"))
                 .filter(Objects::nonNull)
+                .distinct()
                 .toList();
 
         // 4. LLM에 질문
         String prompt = """
-                당신은 블로그 글을 기반으로 답변하는 AI 비서입니다.
-                반드시 한국어로만 답변하세요.
+                You are a Korean AI assistant. You MUST respond in Korean only. Never use Chinese, Japanese, or any other language.
+                
                 아래 블로그 글들을 참고해서 질문에 답해줘.
                 블로그 글에 있는 내용만 답하고, 추론하거나 없는 내용은 절대 추가하지 마세요.
                 없는 내용은 "블로그에서 찾을 수 없어요" 라고 답해줘.
+                반드시 한국어로만 답변하세요.
                 
                 [참고 블로그 글]
                 %s
