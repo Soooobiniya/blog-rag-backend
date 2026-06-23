@@ -30,15 +30,24 @@ public class CrawlService {
 
     public int getPostingCount() {
         Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM vector_store", Integer.class);
+                "SELECT COUNT(DISTINCT metadata->>'url') FROM vector_store",
+                Integer.class);
         return count != null ? count : 0;
+    }
+
+    private boolean isAlreadyStored(String url) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM vector_store WHERE metadata->>'url' = ?",
+                Integer.class, url
+        );
+        return count != null && count > 0;
     }
 
     public List<String> crawlAndStore() throws Exception {
         List<String> savedTitles = new ArrayList<>();
         List<org.springframework.ai.document.Document> documents = new ArrayList<>();
 
-        for (int page = 1; page <= 5; page++) {
+        for (int page = 1; page <= 100; page++) {
             String listUrl = "https://blog.naver.com/PostList.naver?blogId=" + blogId + "&currentPage=" + page;
             Document listPage = Jsoup.connect(listUrl)
                     .userAgent("Mozilla/5.0")
@@ -60,6 +69,11 @@ public class CrawlService {
 
                 String content = crawlContent(postUrl);
                 if (content.isEmpty()) continue;
+
+                if (isAlreadyStored(postUrl)) {
+                    savedTitles.add(postUrl + " (이미 저장됨)");
+                    continue;
+                }
 
                 org.springframework.ai.document.Document doc =
                         new org.springframework.ai.document.Document(content, Map.of(
