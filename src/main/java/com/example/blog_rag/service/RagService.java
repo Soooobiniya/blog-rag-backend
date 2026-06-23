@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Map;
 
 @Service
 public class RagService {
@@ -20,46 +21,61 @@ public class RagService {
         this.vectorStore = vectorStore;
     }
 
-    public ChatResponse chat(String message) {
-        // 1. 질문과 유사한 문서 검색
+    public ChatResponse chat(String message, List<Map<String, String>> history) {
+        String searchQuery = message;
+        if (history != null && !history.isEmpty()) {
+            String lastUserMsg = history.stream()
+                    .filter(h -> h.get("role").equals("user"))
+                    .reduce((first, second) -> second)
+                    .map(h -> h.get("content"))
+                    .orElse("");
+            searchQuery = lastUserMsg + " " + message;
+        }
+
         List<org.springframework.ai.document.Document> docs = vectorStore.similaritySearch(
                 SearchRequest.builder()
-                        .query(message)
+                        .query(searchQuery)
                         .topK(5)
                         .similarityThreshold(0.1)
                         .build()
         );
-        docs.forEach(doc ->
-                System.out.println("검색된 문서: " + doc.getMetadata().get("url") + " / " + doc.getText().substring(0, Math.min(50, doc.getText().length())))
-        );
 
-        // 2. 검색된 문서로 컨텍스트 구성
         String context = docs.stream()
                 .map(org.springframework.ai.document.Document::getText)
                 .reduce("", (a, b) -> a + "\n\n" + b);
 
-        // 3. 출처 URL 추출
         List<String> sources = docs.stream()
                 .map(doc -> (String) doc.getMetadata().get("url"))
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
 
-        // 4. LLM에 질문
+        // 대화 히스토리 조합
+        StringBuilder historyText = new StringBuilder();
+        if (history != null) {
+            for (Map<String, String> h : history) {
+                String role = h.get("role").equals("user") ? "사용자" : "AI";
+                historyText.append(role).append(": ").append(h.get("content")).append("\n");
+            }
+        }
+
         String prompt = """
-                You are a Korean AI assistant. You MUST respond in Korean only. Never use Chinese, Japanese, or any other language.
-                
-                아래 블로그 글들을 참고해서 질문에 답해줘.
-                블로그 글에 있는 내용만 답하고, 추론하거나 없는 내용은 절대 추가하지 마세요.
-                없는 내용은 "블로그에서 찾을 수 없어요" 라고 답해줘.
-                반드시 한국어로만 답변하세요.
-                
-                [참고 블로그 글]
-                %s
-                
-                [질문]
-                %s
-                """.formatted(context, message);
+        You are a Korean AI assistant. You MUST respond in Korean only. Never use Chinese, Japanese, or any other language.
+        
+        아래 블로그 글들을 참고해서 질문에 답해줘.
+        블로그 글에 있는 내용만 답하고, 추론하거나 없는 내용은 절대 추가하지 마세요.
+        없는 내용은 "블로그에서 찾을 수 없어요" 라고 답해줘.
+        반드시 한국어로만 답변하세요.
+        
+        [이전 대화 - 반드시 참고하여 문맥을 이어서 답변하세요]
+        %s
+        
+        [참고 블로그 글]
+        %s
+        
+        [현재 질문 - 이전 대화 문맥을 반드시 고려하세요]
+        %s
+        """.formatted(historyText, context, message);
 
         String answer = chatClient.prompt()
                 .user(prompt)

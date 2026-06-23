@@ -1,3 +1,6 @@
 package com.example.blog_rag.dto;
 
-public record ChatRequest(String message) {}
+import java.util.List;
+import java.util.Map;
+
+public record ChatRequest(String message, List<Map<String, String>> history) {}
